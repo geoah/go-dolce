@@ -3,12 +3,17 @@ package dolcelog
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"os"
 	"strconv"
 	"strings"
 	"sync"
+)
+
+var (
+	ErrNotFound = errors.New("Log file not found or created.")
 )
 
 /*
@@ -28,15 +33,14 @@ type DolceLog struct {
 	logMutex sync.Mutex
 }
 
-var dlog DolceLog
-
-// Initialiazes the log
-func init() {
-	dlog.version = 1
-	dlog.filename = "db.log"
-	dlog.path = "data"
-	// TODO change this to reflect the index of the log when the server is restarted
-	dlog.index = 0
+// New creates and initializes a new DolceLog
+func New(fp, fn string) (*DolceLog, error) {
+	dlog := &DolceLog{
+		version:  1,
+		filename: fn,
+		path:     fp,
+		index:    0, // TODO change this to reflect the index of the log when the server is restarted
+	}
 
 	var filepath = dlog.path + "/" + dlog.filename
 
@@ -48,21 +52,20 @@ func init() {
 			log.Fatal(err)
 		}
 
-		fmt.Println("Log file not found and created.")
 		dlog.file = f
-		return
+		return nil, ErrNotFound
 	}
 
 	// If file exists open it
 	f, err := os.OpenFile(filepath, os.O_RDWR|os.O_APPEND, 0666)
 	if err != nil {
-		log.Fatal(err)
-		return
+		return nil, ErrNotFound
 	}
 
 	fmt.Println("Log file found.")
 	dlog.file = f
 
+	return dlog, nil
 }
 
 // Set appened to the log
@@ -84,11 +87,6 @@ func (l *DolceLog) Set(key string, value []byte) {
 	}
 }
 
-// GetLogInst returns the log instance.
-func GetInst() *DolceLog {
-	return &dlog
-}
-
 // GetFromIndex returns the log after a specific index.
 // TODO implement a better file parser
 func (l *DolceLog) GetFromIndex(index int) ([]string, error) {
@@ -98,7 +96,7 @@ func (l *DolceLog) GetFromIndex(index int) ([]string, error) {
 	var result = make([]string, 0)
 	i := 0
 
-	f, err := os.Open(dlog.filename)
+	f, err := os.Open(l.filename)
 	defer f.Close()
 	if err != nil {
 		log.Fatal(err)
@@ -136,7 +134,7 @@ func (l *DolceLog) GetAll() ([]string, error) {
 	var result = make([]string, 0)
 	i = 0
 
-	f, err := os.Open(dlog.filename)
+	f, err := os.Open(l.filename)
 	defer f.Close()
 	if err != nil {
 		log.Fatal(err)

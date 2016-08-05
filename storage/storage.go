@@ -21,18 +21,15 @@ type Database struct {
 	Version      int
 	Data         map[string][]byte
 	dbMutex      sync.Mutex
-}
-
-func init() {
+	dlog         *dolcelog.DolceLog
 }
 
 func (d *Database) Set(key string, value string) error {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	dlog := dolcelog.GetInst()
 	data := []byte(value)
-	dlog.Set(key, data)
+	d.dlog.Set(key, data)
 	d.Data[key] = data
 
 	return nil
@@ -46,9 +43,12 @@ func (d *Database) Delete(key string) (bool, error) {
 	return false, nil
 }
 
-// CreateDBFile creates the db file and returns a pointer to it
-func CreateDBFile(databaseName string) (*Database, error) {
-	var db Database
+// New creates the db file and returns a pointer to it
+func New(dl *dolcelog.DolceLog, databaseName string) (*Database, error) {
+	db := &Database{
+		dlog: dl,
+	}
+
 	_, err := os.Stat(config.DBFolder)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -86,8 +86,9 @@ func CreateDBFile(databaseName string) (*Database, error) {
 	}
 	wr.Flush()
 
-	return &db, nil
+	return db, nil
 }
+
 func DeleteDBFile(db string) bool {
 	err := os.Remove(db)
 	if err != nil {
@@ -106,8 +107,7 @@ func (d *Database) RebuildMap() {
 	d.dbMutex.Lock()
 	defer d.dbMutex.Unlock()
 
-	dLog := dolcelog.GetInst()
-	temp, err := dLog.GetAll()
+	temp, err := d.dlog.GetAll()
 	if err != nil {
 		log.Fatal("Could not get log.")
 		return
